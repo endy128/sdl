@@ -12,12 +12,13 @@
         "-DNDEBUG",
         "-pedantic-errors",
         "-Werror",
-        "-std=c++23",
+        "-std=c++17",
         // "${file}", # for a single file
         "${fileDirname}/**.cpp",
         "-o",
         "${fileDirname}/bin/${fileBasenameNoExtension}",
-        "-lSDL3"
+        "-lSDL3",
+        "-lSDL3_image"
       ],
       "options": {
         "cwd": "${fileDirname}"
