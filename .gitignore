@@ -33,3 +33,6 @@
 
 # all bin dirs
 **/bin/
+
+# all build dirs
+**/build/
