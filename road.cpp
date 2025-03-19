@@ -105,10 +105,11 @@ void Road::RenderSegment(int segmentIndex, float min, float max) {
     mPreviousY2 = SCREENY;
   }
 
+  // interpret segement z number to a fixed range
   // output = minOutput + (input - minInput) * (maxOutput - minOutput) / (maxInput - minInput)
   float minOutput, maxOutput, z{0.0f};
-  minOutput = SCREENY / 2;
-  maxOutput = SCREENY;
+  minOutput = 0.0f;
+  maxOutput = SCREENY / 2;
   z = minOutput + (segment.z - min) * (maxOutput - minOutput) / (max - min);
 
 
