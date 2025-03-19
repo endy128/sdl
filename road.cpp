@@ -45,7 +45,10 @@ void Road::InitialiseRoad() {
     {
       segment.lineColor = SDL_Color{255, 255, 255, 255};
     }
-
+    if (i % 50 == 0) {
+      segment.roadColor = SDL_Color{255, 0, 0, 255};
+      segment.glassColor = SDL_Color{0, 128, 0, 255};
+    }
     mSegments.push_back(segment);
   }
   std::cout << "Initialised road with " << mSegments.size() << " segments"
@@ -58,17 +61,27 @@ void Road::Render() {
 
   // Calculate which segment we're on based on player position
   int baseSegment = static_cast<int>(mPlayerPosition / mSegmentHeight);
+  std::cout << "Base segment: " << baseSegment << std::endl;
 
   // Render segments starting from current position
-  for (int i = 0; i < VIEWDISTANCE; i++) {
-    int currentSegment = (baseSegment + i) % mTrackLength;
-    if (currentSegment >= 0 && currentSegment < mTrackLength) {
-      RenderSegment(currentSegment);
-    }
+  // for (int i = baseSegment; i < baseSegment + VIEWDISTANCE; i++) {
+  //   int currentSegment = (baseSegment + i) % mTrackLength;
+  //   if (currentSegment >= 0 && currentSegment < mTrackLength) {
+  //     RenderSegment(currentSegment);
+  //   }
+  // }
+
+  float min = mSegments[baseSegment].z;
+  float max = mSegments[baseSegment + VIEWDISTANCE].z;
+
+  // render only segements from the base segment to the base segment + view
+  for (int i = baseSegment; i < baseSegment + VIEWDISTANCE; i++) {
+    RenderSegment(i, min, max);
   }
+
 }
 
-void Road::RenderSegment(int segmentIndex) {
+void Road::RenderSegment(int segmentIndex, float min, float max) {
 
   RoadSegment &segment = mSegments[segmentIndex];
 
@@ -92,17 +105,24 @@ void Road::RenderSegment(int segmentIndex) {
     mPreviousY2 = SCREENY;
   }
 
+  // output = minOutput + (input - minInput) * (maxOutput - minOutput) / (maxInput - minInput)
+  float minOutput, maxOutput, z{0.0f};
+  minOutput = SCREENY / 2;
+  maxOutput = SCREENY;
+  z = minOutput + (segment.z - min) * (maxOutput - minOutput) / (max - min);
+
+
   SDL_Vertex roadQuad[4];
   // top left
   roadQuad[0].position.x = screenX - mSegmentWidth;
-  roadQuad[0].position.y = screenY - segmentIndex * mSegmentHeight;
+  roadQuad[0].position.y = screenY - z ;
   roadQuad[0].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
 
   // top right
   roadQuad[1].position.x = screenX + mSegmentWidth;
-  roadQuad[1].position.y = screenY - segmentIndex * mSegmentHeight;
+  roadQuad[1].position.y = screenY - z ;
   roadQuad[1].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
@@ -124,7 +144,7 @@ void Road::RenderSegment(int segmentIndex) {
   int indices[] = {0, 1, 2, 2, 3, 0};
 
   SDL_RenderGeometry(mRenderer, nullptr, roadQuad, 4, indices, 6);
-  std::cout << mSegments[segmentIndex].z << std::endl;
+  std::cout << mSegments[segmentIndex].z  << std::endl;
 
   mPreviousX1 = roadQuad[1].position.x;
   mPreviousY1 = roadQuad[1].position.y;

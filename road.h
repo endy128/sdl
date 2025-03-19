@@ -20,7 +20,7 @@ public:
 
 private:
   void InitialiseRoad();
-  void RenderSegment(int segmentIndex);
+  void RenderSegment(int segmentIndex, float min, float max);
   void ProjectToScreen(float x, float y, float z, float &screenX,
                        float &screenY, float &scale);
 
