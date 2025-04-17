@@ -63,39 +63,24 @@ void Road::Render() {
   int baseSegment = static_cast<int>(mPlayerPosition / mSegmentHeight);
   std::cout << "Base segment: " << baseSegment << std::endl;
 
-  // Render segments starting from current position
-  // for (int i = baseSegment; i < baseSegment + VIEWDISTANCE; i++) {
-  //   int currentSegment = (baseSegment + i) % mTrackLength;
-  //   if (currentSegment >= 0 && currentSegment < mTrackLength) {
-  //     RenderSegment(currentSegment);
-  //   }
-  // }
-
   float min = mSegments[baseSegment].z;
   float max = mSegments[baseSegment + VIEWDISTANCE].z;
 
   // render only segements from the base segment to the base segment + view
-  for (int i = baseSegment; i < baseSegment + VIEWDISTANCE; i++) {
-    RenderSegment(i, min, max);
+  for (int i = baseSegment, drawIndex = 0; i <= baseSegment + VIEWDISTANCE; i++, drawIndex++) {
+    RenderSegment(i, min, max, drawIndex);
   }
-
 }
 
-void Road::RenderSegment(int segmentIndex, float min, float max) {
+void Road::RenderSegment(int segmentIndex, float min, float max, int drawIndex) {
 
   RoadSegment &segment = mSegments[segmentIndex];
 
   float screenX = SCREENX / 2;
   float screenY = SCREENY;
 
-  // do not draw segments behind the camera
-
-  // draw VIEWDISTANCE segments
-
-  // draw centre of screen +/- 1/2 road width
-  // draw width relative to position on screen, scale with distance
-
   // set previous x and y to bottom or screen and max road width
+  // FIXME: not needed?
   if (segmentIndex == 0) {
     // bottom right
     mPreviousX1 = SCREENX;
@@ -105,25 +90,47 @@ void Road::RenderSegment(int segmentIndex, float min, float max) {
     mPreviousY2 = SCREENY;
   }
 
-  // interpret segement z number to a fixed range
-  // output = minOutput + (input - minInput) * (maxOutput - minOutput) / (maxInput - minInput)
-  float minOutput, maxOutput, z{0.0f};
-  minOutput = 0.0f;
-  maxOutput = SCREENY / 2;
-  z = minOutput + (segment.z - min) * (maxOutput - minOutput) / (max - min);
+    // try and inpliment road perspecive
+    float DDZ{4.0f};
+    float DZ{0.0f};
+    float Z{0.0f};
+    float PREV_DZ{0.0f};
+    if (drawIndex > 0) {
+      DZ = DZ * DDZ;
+      Z = (drawIndex + PREV_DZ) * DDZ;
+      PREV_DZ = Z;
+    }
+    // end, use Z to adjust z value
+
+  // interpret segement z number to a fixed range so we only draw the road
+  // segements between the min and max z values. This allows us to change the
+  // number of road segements displayed 
+  // Formula: output = minOutput + (input - minInput) * (maxOutput - minOutput) / (maxInput - minInput)
+  float minOutput, z{0.0f};
+  float maxOutput{SCREENY / 2};
+  // FIXME: update this `z` var to give illusion of distance to the segements
+  //  it will need to know which out of the 10 segements it is
+  if (drawIndex == 0) {//FIXME: hacky fix
+    z = 0.0f;
+  } else {
+    z = minOutput + (segment.z - min) * (maxOutput - minOutput) / (max - min);//FIXME: when `segementIndex = 0`, this z value is `4.18918e-41`
+  }
+
+  
+  // amend z value by Z
 
 
   SDL_Vertex roadQuad[4];
   // top left
   roadQuad[0].position.x = screenX - mSegmentWidth;
-  roadQuad[0].position.y = screenY - z ;
+  roadQuad[0].position.y = screenY - z;
   roadQuad[0].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
 
   // top right
   roadQuad[1].position.x = screenX + mSegmentWidth;
-  roadQuad[1].position.y = screenY - z ;
+  roadQuad[1].position.y = screenY - z;
   roadQuad[1].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
@@ -145,7 +152,11 @@ void Road::RenderSegment(int segmentIndex, float min, float max) {
   int indices[] = {0, 1, 2, 2, 3, 0};
 
   SDL_RenderGeometry(mRenderer, nullptr, roadQuad, 4, indices, 6);
-  std::cout << mSegments[segmentIndex].z  << std::endl;
+  std::cout << "Segment.z: " << mSegments[segmentIndex].z << "\t z: " << z
+            << "\tSeg Index: " << segmentIndex << "\tdrawIndex: " << drawIndex 
+            << "\tmin: " << min << "\tmax: " << max
+            << "\tZ: " << Z
+            << '\n';
 
   mPreviousX1 = roadQuad[1].position.x;
   mPreviousY1 = roadQuad[1].position.y;
@@ -153,44 +164,26 @@ void Road::RenderSegment(int segmentIndex, float min, float max) {
   mPreviousY2 = roadQuad[0].position.y;
 }
 
-// void Road::ProjectToScreen(float x, float y, float z, float &screenX,
-//                            float &screenY, float &screenWidth) {
-//   float cameraHeight = 1000.0f;
-//   float cameraDepth = 0.84f;
-
-//   // Adjust z to be relative to player
-//   float relativeZ = z - cameraHeight;
-
-//   if (relativeZ <= 0)
-//     relativeZ = 0.1f; // Prevent division by zero
-
-//   float scale = cameraDepth / relativeZ;
-//   screenX = mScreenWidth / 2 + (x * scale * mScreenWidth / 2);
-//   screenY = mScreenHeight / 2 - (y * scale * mScreenHeight / 2);
-//   screenWidth = mSegmentWidth * scale; // Scale the road width with
-//   perspective
-// }
-
 void Road::Update(float deltaTime) {
-    // Handle keyboard input
-    const bool* keystate = SDL_GetKeyboardState(nullptr);
-    
-    if (keystate[SDL_SCANCODE_UP]) {
-        mSpeed = std::min(mSpeed + ACCELERATION * deltaTime, MAX_SPEED);
-    } else if (keystate[SDL_SCANCODE_DOWN]) {
-        mSpeed = std::max(mSpeed - ACCELERATION * deltaTime, 0.0f);
-    } else {
-        // Gradual slow down when no key is pressed
-        mSpeed = std::max(0.0f, mSpeed - ACCELERATION * deltaTime * 0.5f);
-    }
+  // Handle keyboard input
+  const bool *keystate = SDL_GetKeyboardState(nullptr);
 
-    // Update position
-    mPlayerPosition += mSpeed;
-    
-    // Wrap around the track
-    if (mPlayerPosition >= mTrackLength * mSegmentHeight) {
-        mPlayerPosition = 0;
-    }
+  if (keystate[SDL_SCANCODE_UP]) {
+    mSpeed = std::min(mSpeed + ACCELERATION * deltaTime, MAX_SPEED);
+  } else if (keystate[SDL_SCANCODE_DOWN]) {
+    mSpeed = std::max(mSpeed - ACCELERATION * deltaTime, 0.0f);
+  } else {
+    // Gradual slow down when no key is pressed
+    mSpeed = std::max(0.0f, mSpeed - ACCELERATION * deltaTime * 0.5f);
+  }
+
+  // Update position
+  mPlayerPosition += mSpeed;
+
+  // Wrap around the track
+  if (mPlayerPosition >= mTrackLength * mSegmentHeight) {
+    mPlayerPosition = 0;
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -218,23 +211,23 @@ int main(int argc, char *argv[]) {
   Road road(ren, SCREENX, SCREENY);
 
   Uint64 previousTime = SDL_GetTicks();
-    
-    while (!quit) {
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_EVENT_QUIT) {
-                quit = true;
-            }
-        }
 
-        // Calculate delta time
-        Uint64 currentTime = SDL_GetTicks();
-        float deltaTime = (currentTime - previousTime) / 1000.0f;
-        previousTime = currentTime;
-
-        road.Update(deltaTime);
-        road.Render();
-        SDL_RenderPresent(ren);
+  while (!quit) {
+    while (SDL_PollEvent(&e)) {
+      if (e.type == SDL_EVENT_QUIT) {
+        quit = true;
+      }
     }
+
+    // Calculate delta time
+    Uint64 currentTime = SDL_GetTicks();
+    float deltaTime = (currentTime - previousTime) / 1000.0f;
+    previousTime = currentTime;
+
+    road.Update(deltaTime);
+    road.Render();
+    SDL_RenderPresent(ren);
+  }
 
   SDL_DestroyRenderer(ren);
   SDL_DestroyWindow(win);
