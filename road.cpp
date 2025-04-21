@@ -7,9 +7,10 @@
 #define TRACKLENGTH 1000
 #define SCREENX 640
 #define SCREENY 480
-#define VIEWDISTANCE 10 // how many segments to render
-#define SEGMENTHEIGHT 20.0F
+#define VIEWDISTANCE 40 // how many segments to render
+#define SEGMENTHEIGHT 10.0F
 #define SEGMENTWIDTH 200.0F
+#define DEBUG 1
 
 Road::Road(SDL_Renderer *ren, int screenWidth, int screenHeight)
     : mRenderer(ren), mScreenWidth(screenWidth), mScreenHeight(screenHeight),
@@ -34,6 +35,21 @@ void Road::InitialiseRoad() {
     segment.curve = 0.0f;
     segment.elevation = 0.0f;
 
+    if (i > 50 && i < 100) {
+      segment.curve = 0.5f;
+    }
+
+    if (i > 200 && i < 300) {
+      segment.curve = -0.5f;
+    }
+
+    if (i > 400 && i < 500) {
+      segment.elevation = 0.5f;
+    }
+    if (i > 600 && i < 700) {
+      segment.elevation = -0.5f;
+    }
+
     if (i % 2 == 0) {
       segment.roadColor = SDL_Color{128, 128, 128, 255};
       segment.glassColor = SDL_Color{0, 128, 0, 255};
@@ -55,117 +71,7 @@ void Road::InitialiseRoad() {
             << std::endl;
 }
 
-void Road::Render() {
-  SDL_SetRenderDrawColor(mRenderer, 113, 197, 207, 255); // draw the sky
-  SDL_RenderClear(mRenderer);
-
-  // Calculate which segment we're on based on player position
-  int baseSegment = static_cast<int>(mPlayerPosition / mSegmentHeight);
-  std::cout << "Base segment: " << baseSegment << std::endl;
-
-  float min = mSegments[baseSegment].z;
-  float max = mSegments[baseSegment + VIEWDISTANCE].z;
-
-  // render only segements from the base segment to the base segment + view
-  for (int i = baseSegment, drawIndex = 0; i <= baseSegment + VIEWDISTANCE; i++, drawIndex++) {
-    RenderSegment(i, min, max, drawIndex);
-  }
-}
-
-void Road::RenderSegment(int segmentIndex, float min, float max, int drawIndex) {
-
-  RoadSegment &segment = mSegments[segmentIndex];
-
-  float screenX = SCREENX / 2;
-  float screenY = SCREENY;
-
-  // set previous x and y to bottom or screen and max road width
-  // FIXME: not needed?
-  if (segmentIndex == 0) {
-    // bottom right
-    mPreviousX1 = SCREENX;
-    mPreviousY1 = SCREENY;
-    // bottom left
-    mPreviousX2 = 0;
-    mPreviousY2 = SCREENY;
-  }
-
-    // try and inpliment road perspecive
-    float DDZ{4.0f};
-    float DZ{0.0f};
-    float Z{0.0f};
-    float PREV_DZ{0.0f};
-    if (drawIndex > 0) {
-      DZ = DZ * DDZ;
-      Z = (drawIndex + PREV_DZ) * DDZ;
-      PREV_DZ = Z;
-    }
-    // end, use Z to adjust z value
-
-  // interpret segement z number to a fixed range so we only draw the road
-  // segements between the min and max z values. This allows us to change the
-  // number of road segements displayed 
-  // Formula: output = minOutput + (input - minInput) * (maxOutput - minOutput) / (maxInput - minInput)
-  float minOutput, z{0.0f};
-  float maxOutput{SCREENY / 2};
-  // FIXME: update this `z` var to give illusion of distance to the segements
-  //  it will need to know which out of the 10 segements it is
-  if (drawIndex == 0) {//FIXME: hacky fix
-    z = 0.0f;
-  } else {
-    z = minOutput + (segment.z - min) * (maxOutput - minOutput) / (max - min);//FIXME: when `segementIndex = 0`, this z value is `4.18918e-41`
-  }
-
-  
-  // amend z value by Z
-
-
-  SDL_Vertex roadQuad[4];
-  // top left
-  roadQuad[0].position.x = screenX - mSegmentWidth;
-  roadQuad[0].position.y = screenY - z;
-  roadQuad[0].color = {segment.roadColor.r / 255.0f,
-                       segment.roadColor.g / 255.0f,
-                       segment.roadColor.b / 255.0f, 1.0f};
-
-  // top right
-  roadQuad[1].position.x = screenX + mSegmentWidth;
-  roadQuad[1].position.y = screenY - z;
-  roadQuad[1].color = {segment.roadColor.r / 255.0f,
-                       segment.roadColor.g / 255.0f,
-                       segment.roadColor.b / 255.0f, 1.0f};
-
-  // bottom right
-  roadQuad[2].position.x = mPreviousX1;
-  roadQuad[2].position.y = mPreviousY1;
-  roadQuad[2].color = {segment.roadColor.r / 255.0f,
-                       segment.roadColor.g / 255.0f,
-                       segment.roadColor.b / 255.0f, 1.0f};
-
-  // bottom left
-  roadQuad[3].position.x = mPreviousX2;
-  roadQuad[3].position.y = mPreviousY2;
-  roadQuad[3].color = {segment.roadColor.r / 255.0f,
-                       segment.roadColor.g / 255.0f,
-                       segment.roadColor.b / 255.0f, 1.0f};
-
-  int indices[] = {0, 1, 2, 2, 3, 0};
-
-  SDL_RenderGeometry(mRenderer, nullptr, roadQuad, 4, indices, 6);
-  std::cout << "Segment.z: " << mSegments[segmentIndex].z << "\t z: " << z
-            << "\tSeg Index: " << segmentIndex << "\tdrawIndex: " << drawIndex 
-            << "\tmin: " << min << "\tmax: " << max
-            << "\tZ: " << Z
-            << '\n';
-
-  mPreviousX1 = roadQuad[1].position.x;
-  mPreviousY1 = roadQuad[1].position.y;
-  mPreviousX2 = roadQuad[0].position.x;
-  mPreviousY2 = roadQuad[0].position.y;
-}
-
 void Road::Update(float deltaTime) {
-  // Handle keyboard input
   const bool *keystate = SDL_GetKeyboardState(nullptr);
 
   if (keystate[SDL_SCANCODE_UP]) {
@@ -177,12 +83,11 @@ void Road::Update(float deltaTime) {
     mSpeed = std::max(0.0f, mSpeed - ACCELERATION * deltaTime * 0.5f);
   }
 
-  // Update position
+  // Update position and wrap using proper modulo
   mPlayerPosition += mSpeed;
-
-  // Wrap around the track
-  if (mPlayerPosition >= mTrackLength * mSegmentHeight) {
-    mPlayerPosition = 0;
+  mPlayerPosition = fmod(mPlayerPosition, mTrackLength * mSegmentHeight);
+  if (mPlayerPosition < 0) {
+    mPlayerPosition += mTrackLength * mSegmentHeight;
   }
 }
 
@@ -234,4 +139,124 @@ int main(int argc, char *argv[]) {
   SDL_Quit();
 
   return 0;
+}
+
+void Road::RenderSegment(int segmentIndex, float min, float max,
+                         int drawIndex) {
+  RoadSegment &segment = mSegments[segmentIndex];
+
+  // STEP 1: Calculate relative position to player
+  float relativeZ = segment.z - mPlayerPosition;
+  while (relativeZ < 0)
+    relativeZ += (mTrackLength * mSegmentHeight);
+
+  // STEP 2: Define road perspective constants
+  float cameraHeight = 100.0f; // Height of camera above road
+  float roadWidth = 700.0f;    // Base width (will be scaled by perspective)
+  float clipNear = 0.1f;       // Near clipping plane
+
+  // STEP 3: Projection and perspective calculations
+  // Map the segment Z position to screen Y position using perspective
+  float projectionScale = cameraHeight / relativeZ;
+
+  // This maps the Z distance to a screen Y coordinate (horizon at SCREENY/3)
+  float screenY = (SCREENY / 3) + (projectionScale * SCREENY / 2);
+
+  // Width is scaled by perspective too
+  float scaledWidth = (roadWidth * projectionScale) / 2.0f;
+
+  // Center of the screen is the center of the road
+  float screenX = SCREENX / 2.0f;
+
+  // STEP 4: Calculate the four corners of our road segment
+  float x1 = screenX - scaledWidth; // Left edge
+  float x2 = screenX + scaledWidth; // Right edge
+  float y = screenY;
+
+  // Store current segment coordinates
+  float currentX1 = x1;
+  float currentX2 = x2;
+  float currentY = y;
+
+  // STEP 5: Special cases for first segment
+  if (drawIndex == 0) {
+    // For the first segment (farthest visible), set previous to be slightly
+    // smaller
+    float farScaledWidth =
+        scaledWidth * 0.8f;      // Slightly smaller for perspective
+    float farY = screenY + 5.0f; // Slightly higher on screen
+
+    mPreviousX1 = screenX - farScaledWidth;
+    mPreviousX2 = screenX + farScaledWidth;
+    mPreviousY1 = farY;
+    mPreviousY2 = farY;
+  }
+
+  // Special case for last segment (nearest to player)
+  if (drawIndex == VIEWDISTANCE - 1) {
+    currentY = SCREENY; // Force it to bottom of screen
+    // Make it wide enough to reach screen edges
+    currentX1 = 0;
+    currentX2 = SCREENX;
+  }
+
+  // STEP 6: Draw the road quad
+  SDL_Vertex roadQuad[4];
+
+  // Near left (bottom left)
+  roadQuad[0].position.x = currentX1 + segment.curve * scaledWidth;
+  roadQuad[0].position.y = currentY;
+  roadQuad[0].color = {segment.roadColor.r / 255.0f,
+                       segment.roadColor.g / 255.0f,
+                       segment.roadColor.b / 255.0f, 1.0f};
+
+  // Near right (bottom right)
+  roadQuad[1].position.x = currentX2 + segment.curve * scaledWidth;
+  roadQuad[1].position.y = currentY;
+  roadQuad[1].color = {segment.roadColor.r / 255.0f,
+                       segment.roadColor.g / 255.0f,
+                       segment.roadColor.b / 255.0f, 1.0f};
+
+  // Far right (top right)
+  roadQuad[2].position.x = mPreviousX2;
+  roadQuad[2].position.y = mPreviousY1;
+  roadQuad[2].color = {segment.roadColor.r / 255.0f,
+                       segment.roadColor.g / 255.0f,
+                       segment.roadColor.b / 255.0f, 1.0f};
+
+  // Far left (top left)
+  roadQuad[3].position.x = mPreviousX1;
+  roadQuad[3].position.y = mPreviousY2;
+  roadQuad[3].color = {segment.roadColor.r / 255.0f,
+                       segment.roadColor.g / 255.0f,
+                       segment.roadColor.b / 255.0f, 1.0f};
+
+  int indices[] = {0, 1, 2, 2, 3, 0};
+  SDL_RenderGeometry(mRenderer, nullptr, roadQuad, 4, indices, 6);
+
+  // Store current values for next segment
+  mPreviousX1 = roadQuad[0].position.x;
+  mPreviousX2 = roadQuad[1].position.x;
+  mPreviousY1 = currentY;
+  mPreviousY2 = currentY;
+
+  if (DEBUG) {
+    printf("Segment %d: z=%0.1f relZ=%0.1f Y=%0.1f width=%0.1f\n", segmentIndex,
+           segment.z, relativeZ, y, scaledWidth * 2);
+  }
+}
+
+void Road::Render() {
+  SDL_SetRenderDrawColor(mRenderer, 113, 197, 207, 255); // Draw the sky
+  SDL_RenderClear(mRenderer);
+
+  // Calculate which segment we're on based on player position
+  int baseSegment =
+      static_cast<int>(mPlayerPosition / mSegmentHeight) % mTrackLength;
+
+  // CRITICAL: Render from far to near (back to front)
+  for (int n = VIEWDISTANCE - 1; n >= 0; n--) {
+    int currentSegment = (baseSegment + n) % mTrackLength;
+    RenderSegment(currentSegment, 0, 0, VIEWDISTANCE - 1 - n);
+  }
 }
