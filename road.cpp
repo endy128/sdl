@@ -10,7 +10,7 @@
 #define VIEWDISTANCE 40 // how many segments to render
 #define SEGMENTHEIGHT 10.0F
 #define SEGMENTWIDTH 200.0F
-#define DEBUG 1
+#define DEBUG 0
 
 Road::Road(SDL_Renderer *ren, int screenWidth, int screenHeight)
     : mRenderer(ren), mScreenWidth(screenWidth), mScreenHeight(screenHeight),
@@ -20,6 +20,24 @@ Road::Road(SDL_Renderer *ren, int screenWidth, int screenHeight)
 }
 
 Road::~Road() {}
+
+float Road::createCorner(int index, int startIndex, int endIndex,
+                         double radius) {
+  if (index < startIndex || index > endIndex) {
+    throw std::invalid_argument("Index out of range");
+  }
+
+  // Calculate progress through the corner (0.0 to 1.0)
+  double progress =
+      static_cast<double>(index - startIndex) / (endIndex - startIndex);
+
+  // Map to angle from π/2 to 3π/2 (starts at 0, goes to -radius,
+  // then back to 0)
+  double angle = M_PI / 2.0 + progress * M_PI;
+
+  // Calculate x-coordinate using cosine function
+  return static_cast<float>(radius * std::cos(angle));
+}
 
 void Road::InitialiseRoad() {
   mSegments.clear();               // Clear any existing segments
@@ -35,8 +53,10 @@ void Road::InitialiseRoad() {
     segment.curve = 0.0f;
     segment.elevation = 0.0f;
 
-    if (i > 50 && i < 100) {
-      segment.curve = 0.5f;
+    if (i >= 50 && i <= 250) {
+      double radius{100};
+      segment.curve = createCorner(i, 50, 250, radius);
+      printf("curve %d: %f\n", i, segment.curve);
     }
 
     if (i > 200 && i < 300) {
@@ -77,10 +97,15 @@ void Road::Update(float deltaTime) {
   if (keystate[SDL_SCANCODE_UP]) {
     mSpeed = std::min(mSpeed + ACCELERATION * deltaTime, MAX_SPEED);
   } else if (keystate[SDL_SCANCODE_DOWN]) {
-    mSpeed = std::max(mSpeed - ACCELERATION * deltaTime, 0.0f);
+    // Allow negative speed for backward movement
+    mSpeed = std::max(mSpeed - ACCELERATION * deltaTime, -MAX_SPEED);
   } else {
     // Gradual slow down when no key is pressed
-    mSpeed = std::max(0.0f, mSpeed - ACCELERATION * deltaTime * 0.5f);
+    if (mSpeed > 0) {
+      mSpeed = std::max(0.0f, mSpeed - ACCELERATION * deltaTime * 0.5f);
+    } else if (mSpeed < 0) {
+      mSpeed = std::min(0.0f, mSpeed + ACCELERATION * deltaTime * 0.5f);
+    }
   }
 
   // Update position and wrap using proper modulo
@@ -180,6 +205,7 @@ void Road::RenderSegment(int segmentIndex, float min, float max,
 
   // STEP 5: Special cases for first segment
   if (drawIndex == 0) {
+
     // For the first segment (farthest visible), set previous to be slightly
     // smaller
     float farScaledWidth =
@@ -204,14 +230,14 @@ void Road::RenderSegment(int segmentIndex, float min, float max,
   SDL_Vertex roadQuad[4];
 
   // Near left (bottom left)
-  roadQuad[0].position.x = currentX1 + segment.curve * scaledWidth;
+  roadQuad[0].position.x = currentX1 + segment.curve;
   roadQuad[0].position.y = currentY;
   roadQuad[0].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
 
   // Near right (bottom right)
-  roadQuad[1].position.x = currentX2 + segment.curve * scaledWidth;
+  roadQuad[1].position.x = currentX2 + segment.curve;
   roadQuad[1].position.y = currentY;
   roadQuad[1].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,

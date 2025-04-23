@@ -9,7 +9,7 @@ const float segmentHeight{10.0f};
 struct RoadSegment {
   float x, y, z{0.0f};
   float width{0.0f};
-  float curve{0.0f};
+  double curve{0.0f};
   float elevation{0.0f};
   SDL_Color roadColor{0, 0, 0, 0};
   SDL_Color glassColor{0, 0, 0, 0};
@@ -24,6 +24,7 @@ public:
   void Render();
 
 private:
+  float createCorner(int index, int startIndex, int endIndex, double radius);
   void InitialiseRoad();
   void RenderSegment(int segmentIndex, float min, float max, int drawIndex);
   void ProjectToScreen(float x, float y, float z, float &screenX,
