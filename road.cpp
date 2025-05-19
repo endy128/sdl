@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 
-#define TRACKLENGTH 1000
+#define TRACKLENGTH 10000
 #define SCREENX 640
 #define SCREENY 480
 #define VIEWDISTANCE 40 // how many segments to render
@@ -53,21 +53,24 @@ void Road::InitialiseRoad() {
     segment.curve = 0.0f;
     segment.elevation = 0.0f;
 
-    if (i >= 50 && i <= 250) {
-      double radius{100};
-      segment.curve = createCorner(i, 50, 250, radius);
+    float corner{1.0f};
+    if (i >= 100 && i <= 400) {
+      // double radius{100};
+      // segment.curve = createCorner(i, 50, 250, radius);
+      // printf("curve %d: %f\n", i, segment.curve);
+      segment.curve = corner;
       printf("curve %d: %f\n", i, segment.curve);
     }
 
-    if (i > 200 && i < 300) {
-      segment.curve = -0.5f;
+    if (i > 600 && i < 1000) {
+      segment.curve = -corner;
     }
 
-    if (i > 400 && i < 500) {
-      segment.elevation = 0.5f;
+    if (i > 1200 && i < 1600) {
+      segment.elevation = corner;
     }
-    if (i > 600 && i < 700) {
-      segment.elevation = -0.5f;
+    if (i > 1800 && i < 2200) {
+      segment.elevation = -corner;
     }
 
     if (i % 2 == 0) {
@@ -85,8 +88,17 @@ void Road::InitialiseRoad() {
       segment.roadColor = SDL_Color{255, 0, 0, 255};
       segment.glassColor = SDL_Color{0, 128, 0, 255};
     }
+
     mSegments.push_back(segment);
   }
+
+  // Add all the corners to each segment
+  float accumulator{0.0f};
+  for (int i = 0; i < mTrackLength; i++) {
+    accumulator += mSegments[i].curve;
+    mSegments[i].cornerAccumulator = accumulator;
+  }
+
   std::cout << "Initialised road with " << mSegments.size() << " segments"
             << std::endl;
 }
@@ -230,14 +242,14 @@ void Road::RenderSegment(int segmentIndex, float min, float max,
   SDL_Vertex roadQuad[4];
 
   // Near left (bottom left)
-  roadQuad[0].position.x = currentX1 + segment.curve;
+  roadQuad[0].position.x = currentX1 + segment.cornerAccumulator;
   roadQuad[0].position.y = currentY;
   roadQuad[0].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
                        segment.roadColor.b / 255.0f, 1.0f};
 
   // Near right (bottom right)
-  roadQuad[1].position.x = currentX2 + segment.curve;
+  roadQuad[1].position.x = currentX2 + segment.cornerAccumulator;
   roadQuad[1].position.y = currentY;
   roadQuad[1].color = {segment.roadColor.r / 255.0f,
                        segment.roadColor.g / 255.0f,
